@@ -14,18 +14,19 @@
 #define LIMIT_SWC_PIN 10
 // Slave address
 #define SLAVE_ADDRESS 0x19
-#define ERROR_THRESHOLD 0.01
+// Number of encoder counts to debounce at
+#define ENCODER_ERROR_THRESHOLD 1
 
 // Runtime variables
 double current_encoder, pid_out, target, kp, ki, kd; 
 int homing_pwm = 0;
-int max_pwm = 0;
+int max_pwm = 255;
+bool is_enabled = false;
+bool is_homing = false;
 
 // Runtime objects
 PID pid(&current_encoder, &pid_out, &target, kp, ki, kd, DIRECT);
 Encoder encoder(ENC_PIN_A, ENC_PIN_B);
-bool is_enabled = false;
-bool is_homing = false;
 
 void setup() {
     // Set up I2C bus
@@ -39,25 +40,30 @@ void setup() {
 	pinMode(ENC_PIN_A, INPUT);
 	pinMode(ENC_PIN_B, INPUT);
 	pinMode(LIMIT_SWC_PIN, INPUT_PULLUP);
+	pinMode(LED_BUILTIN, OUTPUT);
 
     // Set PID coeffs
 	pid.SetMode(AUTOMATIC);
-	pid.SetOutputLimits(0, 0);
+	pid.SetOutputLimits(-max_pwm, max_pwm);
 	pid.SetSampleTime(5);
 
-    Serial.begin(9600);
+    update_enabled_led();
 }
 
+// Handle a new I2C request
 void on_request() {
+    // Send encoder position, target, and pid output in float format
     float encoder_float = current_encoder;
     Wire.write((unsigned char*)&encoder_float, 4);
     float target_float = target;
     Wire.write((unsigned char*)&target_float, 4);
+    float pid_out_float = pid_out;
+    Wire.write((unsigned char*)&pid_out_float, 4);
 }
 
+// Handle a new I2C message
 void on_receive(int n_bytes) {
     if (n_bytes != 5) {
-        Serial.println("Wrong number of bytes!");
         while(Wire.available()) Wire.read();
         return;
     }
@@ -72,23 +78,47 @@ void on_receive(int n_bytes) {
 
 void handle_message(Message msg) {
     switch (msg.opcode) {
-        Enable:
+        case Enable:
             is_enabled = msg.content.u32 == 1;
+            update_enabled_led();
             break;
-        Home:
-            is_homing = msg.content.u32 == 1;
+        case Home:
+            is_homing = msg.content.i32 != 0;
+            homing_pwm = msg.content.i32;
             break;
-        SetTarget:
+        case SetTarget:
             target = msg.content.f32;
             break;
-        SetKp: kp = msg.content.f32; break;
-        SetKi: ki = msg.content.f32; break;
-        SetKd: kd = msg.content.f32; break;
+        case SetKp: 
+            kp = msg.content.f32; 
+            pid.SetTunings(kp, ki, kd);
+            break;
+        case SetKi: 
+            ki = msg.content.f32; 
+            pid.SetTunings(kp, ki, kd);
+            break;
+        case SetKd: 
+            kd = msg.content.f32; 
+            pid.SetTunings(kp, ki, kd);
+            break;
+        case LimitPwm:
+            max_pwm = msg.content.u32;
+	        pid.SetOutputLimits(-max_pwm, max_pwm);
+            break;
+        case EncoderPolarity:
+            pid.SetControllerDirection(msg.content.u32 == 1 ? REVERSE : DIRECT);
+            break;
         default:
             break;
     }
 }
 
+// Notify enabled state via status LED
+void update_enabled_led() {
+    digitalWrite(LED_BUILTIN, is_enabled ? HIGH : LOW);
+}
+
+// Set motor PWM, with polarity
 void motor_set_pwm(int speed) {
 	if (abs(speed) <= max_pwm) {
 		if (speed > 0) {
@@ -101,7 +131,9 @@ void motor_set_pwm(int speed) {
 	}
 }
 
+// Main program loop
 void loop() {
+    current_encoder = encoder.read();
 	if (is_enabled) {
         enabled_loop();
 	} else {
@@ -109,6 +141,7 @@ void loop() {
 	}
 }
 
+// Enabled state loop
 inline void enabled_loop() {
     if (is_homing) {
         homing_loop();
@@ -117,24 +150,24 @@ inline void enabled_loop() {
     }
 }
 
+// Homing loop
 inline void homing_loop() {
     if (digitalRead(LIMIT_SWC_PIN) == LOW) {
         is_homing = false;
         current_encoder = 0.0;
         target = current_encoder;
-        encoder.write(target);
+        encoder.write(current_encoder);
     } else {
         motor_set_pwm(homing_pwm);	
     }
 }
 
 inline void control_loop() {
-    current_encoder = encoder.read();
     pid_control();
 }
 
 inline void pid_control() {
-    if (abs(current_encoder - target) > ERROR_THRESHOLD) {
+    if (abs(current_encoder - target) > ENCODER_ERROR_THRESHOLD) {
         if (pid.Compute()) {
             motor_set_pwm((int)pid_out);
         }
