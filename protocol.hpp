@@ -1,27 +1,38 @@
 #pragma once
 
-enum Operation {
-    Enable = 0,
-    SetTarget = 1,
-    Reset = 2,
-    ModePWM = 3,
-    ModePositionPID = 4,
-    ModeVelocityPID = 5,
-    SetKP = 6,
-    SetKI = 7,
-    SetKD = 8,
-    Home = 9,
-    LimitPWM = 10,
-    LimitTargetMin = 11,
-    LimitTargetMax = 12,
-    SetPWM = 13,
-    EncoderPolarity = 14,
-    GetPosition = 15,
-};
+#define MEMBERS() \
+    MEMBER(Enable, 1) \
+    MEMBER(SetTarget, 2) \
+    MEMBER(Reset, 3) \
+    MEMBER(ModePWM, 4) \
+    MEMBER(ModePID, 5) \
+    MEMBER(ModePneumatic, 6) \
+    MEMBER(SetKp, 7) \
+    MEMBER(SetKi, 8) \
+    MEMBER(SetKd, 9) \
+    MEMBER(Home, 10) \
+    MEMBER(LimitPwm, 11) \
+    MEMBER(LimitTargetMin, 12) \
+    MEMBER(LimitTargetMax, 13) \
+    MEMBER(EncoderPolarity, 14)
 
-struct message {
-    enum Operation operation;
-    union {
+#define MEMBER(NAME, NUMBER) NAME = NUMBER,
+enum Operation {
+    MEMBERS()
+};
+#undef MEMBER
+
+#define MEMBER(NAME, NUMBER) (char*)#NAME,
+char* opcode_names[] = {
+    (char*)"ZERO",
+    MEMBERS()
+    (char*)"MAX"
+};
+#undef MEMBER
+
+struct Message {
+    enum Operation opcode;
+    union Content {
         unsigned char bytes[4];
         unsigned int u32;
         int i32;
@@ -29,6 +40,6 @@ struct message {
     } content;
 };
 
-struct message parse_message(unsigned char* bytes);
+struct Message parse_message(unsigned char* bytes);
 
-//void print_message(struct message input);
+void print_message(struct Message input);
