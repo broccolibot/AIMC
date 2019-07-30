@@ -51,6 +51,8 @@ void setup() {
 void on_request() {
     float encoder_float = current_encoder;
     Wire.write((unsigned char*)&encoder_float, 4);
+    float target_float = target;
+    Wire.write((unsigned char*)&target_float, 4);
 }
 
 void on_receive(int n_bytes) {
