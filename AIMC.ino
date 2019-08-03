@@ -15,7 +15,7 @@
 // Slave address
 #define SLAVE_ADDRESS 0x19
 // Number of encoder counts to debounce at
-#define ENCODER_ERROR_THRESHOLD 1
+#define ENCODER_ERROR_THRESHOLD 3
 
 // Runtime variables
 double current_encoder, pid_out, target, kp, ki, kd; 
@@ -123,10 +123,12 @@ void motor_set_pwm(int speed) {
 	if (abs(speed) <= max_pwm) {
 		if (speed > 0) {
 			analogWrite(PWM_PIN_LEFT, speed);
-			analogWrite(PWM_PIN_RIGHT, 0);
+			//analogWrite(PWM_PIN_RIGHT, 0);
+            digitalWrite(PWM_PIN_RIGHT, LOW);
 		} else {
 			analogWrite(PWM_PIN_RIGHT, -speed);
-			analogWrite(PWM_PIN_LEFT, 0);
+			//analogWrite(PWM_PIN_LEFT, 0);
+            digitalWrite(PWM_PIN_LEFT, LOW);
 		}
 	}
 }
