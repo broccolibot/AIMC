@@ -16,9 +16,18 @@
 #define SLAVE_ADDRESS 0x19
 // Number of encoder counts to debounce at
 #define ENCODER_ERROR_THRESHOLD 3
+// How often PID should update
+#define PID_INTERVAL 5
 
 // Runtime variables
-double current_encoder, pid_out, target, kp, ki, kd; 
+double current_encoder = 0.0;
+double pid_out = 0.0;
+double target = 0.0;
+double kp = 0.0;
+double ki = 0.0;
+double kd = 0.0;
+double target_min = -1000.0;
+double target_max = 1000.0; 
 int homing_pwm = 0;
 int max_pwm = 255;
 bool is_enabled = false;
@@ -45,7 +54,7 @@ void setup() {
     // Set PID coeffs
 	pid.SetMode(AUTOMATIC);
 	pid.SetOutputLimits(-max_pwm, max_pwm);
-	pid.SetSampleTime(5);
+	pid.SetSampleTime(PID_INTERVAL);
 
     update_enabled_led();
 }
@@ -64,6 +73,7 @@ void on_request() {
 // Handle a new I2C message
 void on_receive(int n_bytes) {
     if (n_bytes != 5) {
+        // Clear buffer before returning
         while(Wire.available()) Wire.read();
         return;
     }
@@ -87,7 +97,10 @@ void handle_message(Message msg) {
             homing_pwm = msg.content.i32;
             break;
         case SetTarget:
-            target = msg.content.f32;
+            float target_proposal = msg.content.f32;
+            if (target_proposal >= target_min && target_proposal <= target_max) {
+                target = target_proposal;
+            }
             break;
         case SetKp: 
             kp = msg.content.f32; 
@@ -108,6 +121,12 @@ void handle_message(Message msg) {
         case EncoderPolarity:
             pid.SetControllerDirection(msg.content.u32 == 1 ? REVERSE : DIRECT);
             break;
+        case LimitTargetMin:
+            target_min = msg.content.f32;
+            break;
+        case LimitTargetMax:
+            target_max = msg.content.f32;
+            break;
         default:
             break;
     }
@@ -123,12 +142,10 @@ void motor_set_pwm(int speed) {
 	if (abs(speed) <= max_pwm) {
 		if (speed > 0) {
 			analogWrite(PWM_PIN_LEFT, speed);
-			//analogWrite(PWM_PIN_RIGHT, 0);
             digitalWrite(PWM_PIN_RIGHT, LOW);
 		} else {
-			analogWrite(PWM_PIN_RIGHT, -speed);
-			//analogWrite(PWM_PIN_LEFT, 0);
             digitalWrite(PWM_PIN_LEFT, LOW);
+			analogWrite(PWM_PIN_RIGHT, -speed);
 		}
 	}
 }
