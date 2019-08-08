@@ -1,34 +1,21 @@
 #pragma once
 
-#define MEMBERS() \
-    MEMBER(Enable, 1) \
-    MEMBER(SetTarget, 2) \
-    MEMBER(Reset, 3) \
-    MEMBER(ModePWM, 4) \
-    MEMBER(ModePID, 5) \
-    MEMBER(ModePneumatic, 6) \
-    MEMBER(SetKp, 7) \
-    MEMBER(SetKi, 8) \
-    MEMBER(SetKd, 9) \
-    MEMBER(Home, 10) \
-    MEMBER(LimitPwm, 11) \
-    MEMBER(LimitTargetMin, 12) \
-    MEMBER(LimitTargetMax, 13) \
-    MEMBER(EncoderPolarity, 14)
-
-#define MEMBER(NAME, NUMBER) NAME = NUMBER,
 enum Operation {
-    MEMBERS()
+    Enable = 1,
+    SetTarget = 2,
+    Reset = 3,
+    ModePWM = 4,
+    ModePID = 5,
+    ModePneumatic = 6,
+    SetKp = 7,
+    SetKi = 8,
+    SetKd = 9,
+    Home = 10,
+    LimitPwm = 11,
+    LimitTargetMin = 12,
+    LimitTargetMax = 13,
+    EncoderPolarity = 14,
 };
-#undef MEMBER
-
-#define MEMBER(NAME, NUMBER) (char*)#NAME,
-char* opcode_names[] = {
-    (char*)"ZERO",
-    MEMBERS()
-    (char*)"MAX"
-};
-#undef MEMBER
 
 struct Message {
     enum Operation opcode;
@@ -41,5 +28,3 @@ struct Message {
 };
 
 struct Message parse_message(unsigned char* bytes);
-
-void print_message(struct Message input);

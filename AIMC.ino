@@ -97,9 +97,13 @@ void handle_message(Message msg) {
             homing_pwm = msg.content.i32;
             break;
         case SetTarget:
-            float target_proposal = msg.content.f32;
-            if (target_proposal >= target_min && target_proposal <= target_max) {
-                target = target_proposal;
+            //This code MUST be in a block, or the arduino compiler will output erroneous code and
+            //will NOT warn you! Any sane compiler _would_ warn you, but that's a fantasy. 
+            { 
+                float target_proposal = msg.content.f32;
+                if (target_proposal >= target_min && target_proposal <= target_max) {
+                    target = target_proposal;
+                }
             }
             break;
         case SetKp: 
