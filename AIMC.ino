@@ -12,12 +12,13 @@
 #define ENC_PIN_B 1
 // Regular pins
 #define LIMIT_SWC_PIN 10
-// Slave address
-#define SLAVE_ADDRESS 0x19
 // Number of encoder counts to debounce at
 #define ENCODER_ERROR_THRESHOLD 3
 // How often PID should update
 #define PID_INTERVAL 5
+// Pin range for I2C ID (Note: The pins are in low-to-high order and are INPUT_PULLUP)
+#define ID_PIN_MIN 7
+#define ID_PIN_MAX 12
 
 // Runtime variables
 double current_encoder = 0.0;
@@ -37,9 +38,12 @@ bool is_homing = false;
 PID pid(&current_encoder, &pid_out, &target, kp, ki, kd, DIRECT);
 Encoder encoder(ENC_PIN_A, ENC_PIN_B);
 
+int i2c_address_from_pins(int min_pin, int max_pin);
+
+// Setup code
 void setup() {
-    // Set up I2C bus
-    Wire.begin(SLAVE_ADDRESS);
+    // Set up I2C bus and ISRs
+    Wire.begin(i2c_address_from_pins(ID_PIN_MIN, ID_PIN_MAX));
     Wire.onReceive(on_receive);
     Wire.onRequest(on_request);
 
@@ -56,7 +60,21 @@ void setup() {
 	pid.SetOutputLimits(-max_pwm, max_pwm);
 	pid.SetSampleTime(PID_INTERVAL);
 
+    pinMode(LED_BUILTIN, OUTPUT);
     update_enabled_led();
+}
+
+// Digital read (with pullup) each pin in the range, and determine 
+// the number they represent in binary 
+int i2c_address_from_pins(int min_pin, int max_pin) {
+    int i2c_id = 0;
+    for (int pin = min_pin; pin <= max_pin; pin++) {
+        pinMode(pin, INPUT_PULLUP);
+        int pin_out = digitalRead(pin);
+        i2c_id <<= 1;
+        i2c_id |= pin_out;
+    }
+    return i2c_id;
 }
 
 // Handle a new I2C request
@@ -70,22 +88,25 @@ void on_request() {
     Wire.write((unsigned char*)&pid_out_float, 4);
 }
 
-// Handle a new I2C message
+// Handle receiving a new I2C message
 void on_receive(int n_bytes) {
     if (n_bytes != 5) {
-        // Clear buffer before returning
+        // Clear buffer before returning,
+        // will prevent the bus from blocking
         while(Wire.available()) Wire.read();
         return;
     }
     char buffer[5] = {0};
     char* buffer_ptr = buffer;
-    while(Wire.available()) { 
+
+    while(Wire.available()) 
         *buffer_ptr++ = Wire.read();
-    }
+
     Message msg = parse_message(buffer);
     handle_message(msg);
 }
 
+// Incoming message handler
 void handle_message(Message msg) {
     switch (msg.opcode) {
         case Enable:
@@ -165,7 +186,7 @@ void loop() {
 }
 
 // Enabled state loop
-inline void enabled_loop() {
+void enabled_loop() {
     if (is_homing) {
         homing_loop();
     } else {
@@ -174,7 +195,7 @@ inline void enabled_loop() {
 }
 
 // Homing loop
-inline void homing_loop() {
+void homing_loop() {
     if (digitalRead(LIMIT_SWC_PIN) == LOW) {
         is_homing = false;
         current_encoder = 0.0;
@@ -185,11 +206,13 @@ inline void homing_loop() {
     }
 }
 
-inline void control_loop() {
+// Motor control main loop, used for dispatching other loops 
+void control_loop() {
     pid_control();
 }
 
-inline void pid_control() {
+// PID control main loop
+void pid_control() {
     if (abs(current_encoder - target) > ENCODER_ERROR_THRESHOLD) {
         if (pid.Compute()) {
             motor_set_pwm((int)pid_out);
