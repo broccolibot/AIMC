@@ -10,15 +10,16 @@
 // Must be interrupt pins
 #define ENC_PIN_A 0
 #define ENC_PIN_B 1
-// Regular pins
-#define LIMIT_SWC_PIN 10
+// Limit switch input pin (Pullup)
+#define LIMIT_SWC_PIN 12
+#define LIMIT_SWC_CLICKED_STATE LOW
 // Number of encoder counts to debounce at
 #define ENCODER_ERROR_THRESHOLD 3
 // How often PID should update
 #define PID_INTERVAL 5
 // Pin range for I2C ID (Note: The pins are in low-to-high order and are INPUT_PULLUP)
 #define ID_PIN_MIN 7
-#define ID_PIN_MAX 12
+#define ID_PIN_MAX 11
 
 // Runtime variables
 double current_encoder = 0.0;
@@ -93,6 +94,8 @@ void on_request() {
     Wire.write((unsigned char*)&target_float, 4);
     float pid_out_float = pid_out;
     Wire.write((unsigned char*)&pid_out_float, 4);
+    float limit_switch_float = digitalRead(LIMIT_SWC_PIN) == LIMIT_SWC_CLICKED_STATE;
+    Wire.write((unsigned char*)&limit_switch_float, 4);
 }
 
 // Handle receiving a new I2C message
@@ -212,7 +215,7 @@ void enabled_loop() {
 
 // Homing loop
 void homing_loop() {
-    if (digitalRead(LIMIT_SWC_PIN) == LOW) {
+    if (digitalRead(LIMIT_SWC_PIN) == LIMIT_SWC_CLICKED_STATE) {
         is_homing = false;
         current_encoder = 0.0;
         target = current_encoder;
