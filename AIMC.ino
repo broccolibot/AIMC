@@ -34,6 +34,13 @@ int max_pwm = 255;
 bool is_enabled = false;
 bool is_homing = false;
 
+// Control mode setting
+enum ControlMode {
+    ControlModePneumatic,
+    ControlModePID,
+    ControlModePWM,
+} control_mode = ControlModePID;
+
 // Runtime objects
 PID pid(&current_encoder, &pid_out, &target, kp, ki, kd, DIRECT);
 Encoder encoder(ENC_PIN_A, ENC_PIN_B);
@@ -152,6 +159,15 @@ void handle_message(Message msg) {
         case LimitTargetMax:
             target_max = msg.content.f32;
             break;
+        case ModePneumatic :
+            control_mode = ControlModePneumatic;
+            break;
+        case ModePID:
+            control_mode = ControlModePID;
+            break;
+        case ModePWM:
+            control_mode = ControlModePWM;
+            break;
         default:
             break;
     }
@@ -208,7 +224,35 @@ void homing_loop() {
 
 // Motor control main loop, used for dispatching other loops 
 void control_loop() {
-    pid_control();
+    switch (control_mode) {
+        case ControlModePID:
+            pid_control();
+            break;
+        case ControlModePneumatic:
+            pneumatic_control();
+            break;
+        case ControlModePWM:
+            pwm_control();
+            break;
+        default:
+            break;
+    }
+}
+
+// Pneumatic control main loop
+void pneumatic_control() {
+    if (target > 0) {
+        digitalWrite(PWM_PIN_LEFT, HIGH);
+        digitalWrite(PWM_PIN_RIGHT, LOW);
+    } else {
+        digitalWrite(PWM_PIN_LEFT, LOW);
+        digitalWrite(PWM_PIN_RIGHT, HIGH);
+    }
+}
+
+// PWM control main loop
+void pwm_control() {
+    motor_set_pwm((int)target);
 }
 
 // PID control main loop
