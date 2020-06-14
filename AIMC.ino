@@ -4,13 +4,13 @@
 #include <Wire.h>
 
 /// Compile-time settings
-// Must be PWM pins
+// PWM outputs (NOTE: Must be PWM pins)
 #define PWM_PIN_LEFT 5 
 #define PWM_PIN_RIGHT 6 
-// Must be interrupt pins
+// Encoder quadrature inputs (NOTE: Must be interrupt pins)
 #define ENC_PIN_A 0
 #define ENC_PIN_B 1
-// Limit switch input pin (Pullup)
+// Limit switch input pin (NOTE: Must have pull-up)
 #define LIMIT_SWC_PIN 12
 #define LIMIT_SWC_CLICKED_STATE LOW
 // Number of encoder counts to debounce at
