@@ -22,29 +22,29 @@
 #define ID_PIN_MAX 11
 
 // Runtime variables
-double current_encoder = 0.0;
-double pid_out = 0.0;
-double target = 0.0;
-double kp = 0.0;
-double ki = 0.0;
-double kd = 0.0;
-double target_min = -1000.0;
-double target_max = 1000.0; 
-int homing_pwm = 0;
-int max_pwm = 255;
-bool is_enabled = false;
-bool is_homing = false;
+volatile double current_encoder = 0.0;
+volatile double pid_out = 0.0;
+volatile double target = 0.0;
+volatile double kp = 0.0;
+volatile double ki = 0.0;
+volatile double kd = 0.0;
+volatile double target_min = -1000.0;
+volatile double target_max = 1000.0; 
+volatile int homing_pwm = 0;
+volatile int max_pwm = 255;
+volatile bool is_enabled = false;
+volatile bool is_homing = false;
 
 // Control mode setting
-enum ControlMode {
+volatile enum ControlMode {
     ControlModePneumatic,
     ControlModePID,
     ControlModePWM,
 } control_mode = ControlModePID;
 
 // Runtime objects
-PID pid(&current_encoder, &pid_out, &target, kp, ki, kd, DIRECT);
-Encoder encoder(ENC_PIN_A, ENC_PIN_B);
+volatile PID pid(&current_encoder, &pid_out, &target, kp, ki, kd, DIRECT);
+volatile Encoder encoder(ENC_PIN_A, ENC_PIN_B);
 
 int i2c_address_from_pins(int min_pin, int max_pin);
 
